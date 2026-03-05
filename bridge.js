@@ -84,7 +84,9 @@
     try {
       const result = await AuthAPI.superLogin(username, password);
       if (result.success) {
-        // Also save session marker in localStorage for original code compatibility
+        // Save token so it survives page navigation
+        sessionStorage.setItem('fb_super_token', result.token);
+        setAuthToken(result.token);
         localStorage.setItem('fb_super_session', JSON.stringify({ loggedIn: true, at: Date.now() }));
         if (typeof mt_toast === 'function') mt_toast('Super Admin logged in', 'success');
 
@@ -124,24 +126,26 @@
   // ═══════════════════════════════════════════
   const _origSaveTenant = window.mt_saveTenant;
   window.mt_saveTenant = async function(isEdit) {
-    const name = document.getElementById('tenantName')?.value?.trim();
-    const location = document.getElementById('tenantLocation')?.value?.trim();
-    const ownerName = document.getElementById('tenantOwner')?.value?.trim();
-    const phone = document.getElementById('tenantPhone')?.value?.trim();
-    const icon = document.getElementById('tenantIcon')?.value?.trim() || '⛽';
-    const id = document.getElementById('tenantEditId')?.value;
+    // Use same field IDs as index.html form
+    const name     = document.getElementById('tName')?.value?.trim();
+    const location = document.getElementById('tLocation')?.value?.trim();
+    const ownerName= document.getElementById('tOwner')?.value?.trim();
+    const phone    = document.getElementById('tPhone')?.value?.trim();
+    const icon     = document.getElementById('tIcon')?.value || '⛽';
+    const id       = document.getElementById('tId')?.value;
+    const adminUser= document.getElementById('tAdminUser')?.value?.trim() || 'admin';
+    const adminPass= document.getElementById('tAdminPass')?.value || 'admin123';
 
     if (!name || name.length < 2) { mt_toast('Enter a station name', 'error'); return; }
 
     try {
       if (isEdit && id) {
         await TenantAPI.update(id, { name, location, ownerName, phone, icon });
-        mt_toast(`${name} updated`, 'success');
+        mt_toast(name + ' updated', 'success');
       } else {
-        await TenantAPI.create({ name, location, ownerName, phone, icon });
-        mt_toast(`${name} created!`, 'success');
+        await TenantAPI.create({ name, location, ownerName, phone, icon, adminUser, adminPass });
+        mt_toast(name + ' created!', 'success');
       }
-      // Refresh tenant list
       await mt_getTenants_async();
       mt_showSelector();
     } catch (e) {
@@ -279,8 +283,37 @@
   // AUTO-REFRESH TENANTS ON PAGE LOAD
   // ═══════════════════════════════════════════
   document.addEventListener('DOMContentLoaded', function() {
+    // Restore super token if saved
+    const savedToken = sessionStorage.getItem('fb_super_token');
+    if (savedToken) setAuthToken(savedToken);
+
     // Fetch tenants from server in background
     mt_getTenants_async().catch(() => {});
+
+    // Re-apply super login override AFTER all inline scripts have run
+    // (index.html re-assigns window.mt_doSuperLogin at line 3863, undoing our override)
+    window.mt_doSuperLogin = async function() {
+      const userEl = document.getElementById('superUser');
+      const passEl = document.getElementById('superPass');
+      if (!userEl || !passEl) return;
+      const username = userEl.value.trim();
+      const password = passEl.value;
+      if (!username || !password) {
+        if (typeof mt_toast === 'function') mt_toast('Enter username and password', 'error');
+        return;
+      }
+      try {
+        const result = await AuthAPI.superLogin(username, password);
+        if (result.success) {
+          localStorage.setItem('fb_super_session', JSON.stringify({ loggedIn: true, at: Date.now() }));
+          if (typeof mt_toast === 'function') mt_toast('Super Admin logged in', 'success');
+          await mt_getTenants_async();
+          if (typeof mt_showSelector === 'function') mt_showSelector();
+        }
+      } catch (e) {
+        if (typeof mt_toast === 'function') mt_toast(e.message || 'Login failed', 'error');
+      }
+    };
   });
 
   console.log('[Bridge] Backend integration bridge loaded');
