@@ -86,6 +86,7 @@
       if (result.success) {
         // Save token so it survives page navigation
         sessionStorage.setItem('fb_super_token', result.token);
+        localStorage.setItem('fb_super_token', result.token);
         setAuthToken(result.token);
         localStorage.setItem('fb_super_session', JSON.stringify({ loggedIn: true, at: Date.now() }));
         if (typeof mt_toast === 'function') mt_toast('Super Admin logged in', 'success');
@@ -140,7 +141,7 @@
 
     // Ensure token is set — restore from sessionStorage or re-authenticate
     if (!getAuthToken()) {
-      const saved = sessionStorage.getItem('fb_super_token');
+      const saved = sessionStorage.getItem('fb_super_token') || localStorage.getItem('fb_super_token');
       if (saved) {
         setAuthToken(saved);
       } else {
@@ -330,7 +331,7 @@
   // ═══════════════════════════════════════════
   document.addEventListener('DOMContentLoaded', function() {
     // Restore super token if saved
-    const savedToken = sessionStorage.getItem('fb_super_token');
+    const savedToken = sessionStorage.getItem('fb_super_token') || localStorage.getItem('fb_super_token');
     if (savedToken) setAuthToken(savedToken);
 
     // Fetch tenants from server and refresh UI when done
