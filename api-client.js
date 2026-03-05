@@ -53,8 +53,11 @@ async function apiFetch(path, options = {}) {
   });
 
   if (response.status === 401) {
-    // Session expired — trigger logout
-    if (typeof appLogout === 'function') {
+    // Only trigger logout if a token was set (real session expiry).
+    // If _authToken is null, this is an unauthenticated probe (e.g. initial
+    // tenant list fetch before login) — do NOT call appLogout/reload.
+    if (_authToken && typeof appLogout === 'function') {
+      _authToken = null; // clear first to prevent re-entrant 401 loops
       appLogout();
     }
     throw new Error('Session expired');

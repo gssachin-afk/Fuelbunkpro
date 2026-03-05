@@ -348,19 +348,29 @@
     APP.data = null;
     sessionStorage.removeItem('fb_session');
     clearAuth();
-    location.reload();
+    // Show selector instead of reloading — avoids reload loops
+    if (typeof mt_showSelector === 'function') {
+      mt_showSelector();
+    } else {
+      location.reload();
+    }
   };
 
   // ═══════════════════════════════════════════
   // AUTO-REFRESH TENANTS ON PAGE LOAD
   // ═══════════════════════════════════════════
   document.addEventListener('DOMContentLoaded', function() {
-    // Restore super token if saved
+    // Restore super token FIRST before any API calls
     const savedToken = sessionStorage.getItem('fb_super_token') || localStorage.getItem('fb_super_token');
     if (savedToken) setAuthToken(savedToken);
 
-    // Fetch tenants from server and refresh UI when done
-    mt_getTenants_async().then(() => {
+    // Only fetch tenants from server if we have a token (super admin session)
+    // Otherwise just use localStorage cache — avoids 401 loop on unauthenticated load
+    const fetchPromise = savedToken
+      ? mt_getTenants_async()
+      : Promise.resolve(mt_getTenants());
+
+    fetchPromise.then(() => {
       if (typeof mt_showSelector === 'function') mt_showSelector();
     }).catch(() => {});
 
