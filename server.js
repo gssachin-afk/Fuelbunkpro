@@ -11,10 +11,10 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 
-const { initDatabase } = require('./db/schema');
-const { authMiddleware, inputSanitizerMiddleware, auditMiddleware } = require('./middleware/security');
-const authRoutes = require('./api/auth');
-const dataRoutes = require('./api/data');
+const { initDatabase } = require('./schema');
+const { authMiddleware, inputSanitizerMiddleware, auditMiddleware } = require('./security');
+const authRoutes = require('./auth');
+const dataRoutes = require('./data');
 
 // ═══════════════════════════════════════════
 // INITIALIZE (async for sql.js)
@@ -31,9 +31,18 @@ async function startServer() {
 // SECURITY MIDDLEWARE
 // ═══════════════════════════════════════════
 
-// SECURITY: HTTP security headers (relaxed CSP for inline frontend)
+// SECURITY: HTTP security headers
 app.use(helmet({
-  contentSecurityPolicy: false, // Frontend uses inline scripts — CSP handled via _headers in production
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      connectSrc: ["'self'"],
+    }
+  },
   crossOriginEmbedderPolicy: false
 }));
 
@@ -75,7 +84,7 @@ app.set('trust proxy', 1);
 // ═══════════════════════════════════════════
 // STATIC FILES — serve frontend
 // ═══════════════════════════════════════════
-app.use(express.static(path.join(__dirname, 'public'), {
+app.use(express.static(path.join(__dirname, '.'), {
   maxAge: process.env.NODE_ENV === 'production' ? '1d' : 0,
   setHeaders: (res, filePath) => {
     // SECURITY: No-cache for HTML
@@ -120,7 +129,7 @@ app.get('*', (req, res) => {
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({ error: 'API endpoint not found' });
   }
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // ═══════════════════════════════════════════
@@ -157,7 +166,6 @@ app.listen(PORT, '0.0.0.0', () => {
 }
 
 startServer().catch(e => {
-  console.error('[FATAL] Failed to start server:', e.message || e);
-  console.error(e.stack || '');
+  console.error('[FATAL] Failed to start server:', e);
   process.exit(1);
 });
