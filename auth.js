@@ -2,11 +2,11 @@
  * FuelBunk Pro — Auth API Routes
  */
 const express = require('express');
-const { hashPassword } = require('../db/schema');
+const { hashPassword } = require('./schema');
 const {
   bruteForceCheck, recordLoginAttempt, createSession,
   destroySession, auditLog, requireRole
-} = require('../middleware/security');
+} = require('./security');
 
 function authRoutes(db) {
   const router = express.Router();
