@@ -50,6 +50,16 @@ function dataRoutes(db) {
       icon || '⛽', color || '#d4940f', colorLight || '#f0b429', stationCode || ''
     );
 
+    // Also create the admin user for this tenant
+    const { adminUser, adminPass } = req.body;
+    if (adminUser && adminPass) {
+      const adminExists = db.prepare('SELECT id FROM admin_users WHERE tenant_id = ? AND username = ?').get(tenantId, adminUser);
+      if (!adminExists) {
+        db.prepare('INSERT INTO admin_users (tenant_id, name, username, pass_hash, role) VALUES (?, ?, ?, ?, ?)')
+          .run(tenantId, ownerName || adminUser, adminUser, hashPassword(adminPass), 'Owner');
+      }
+    }
+
     auditLog(req, 'CREATE_TENANT', 'tenants', tenantId, name);
     res.json({ success: true, id: tenantId });
   });
