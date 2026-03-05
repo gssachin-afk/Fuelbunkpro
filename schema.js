@@ -9,12 +9,33 @@ function hashPassword(password) {
 }
 
 // Create pool using DATABASE_URL env variable (set by Railway)
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('railway.internal')
-    ? false
-    : { rejectUnauthorized: false }
-});
+const dbUrl = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+if (!dbUrl && !process.env.PGHOST) {
+  console.error('[FATAL] No database connection info found. Set DATABASE_URL.');
+  process.exit(1);
+}
+
+let poolConfig;
+if (dbUrl) {
+  console.log('[DB] Using DATABASE_URL:', dbUrl.replace(/:([^:@]+)@/, ':****@'));
+  poolConfig = {
+    connectionString: dbUrl,
+    ssl: (dbUrl.includes('railway.internal') || dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1'))
+      ? false : { rejectUnauthorized: false }
+  };
+} else {
+  console.log('[DB] Using PG* env vars, host:', process.env.PGHOST);
+  poolConfig = {
+    host: process.env.PGHOST,
+    port: parseInt(process.env.PGPORT || '5432'),
+    database: process.env.PGDATABASE,
+    user: process.env.PGUSER,
+    password: process.env.PGPASSWORD,
+    ssl: false
+  };
+}
+
+const pool = new Pool(poolConfig);
 
 // Wrapper so existing code using db.prepare().run/get/all still works
 class PgDB {
