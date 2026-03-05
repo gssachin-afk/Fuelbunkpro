@@ -359,10 +359,18 @@
     const savedToken = sessionStorage.getItem('fb_super_token') || localStorage.getItem('fb_super_token');
     if (savedToken) setAuthToken(savedToken);
 
-    // Fetch tenants from server and refresh UI when done
-    mt_getTenants_async().then(() => {
-      if (typeof mt_showSelector === 'function') mt_showSelector();
-    }).catch(() => {});
+    // Fetch tenants from server cache.
+    // Only force selector screen when no station is selected.
+    const activeTenant = (typeof mt_getActiveTenant === 'function') ? mt_getActiveTenant() : null;
+    if (!activeTenant) {
+      mt_getTenants_async().then(() => {
+        if (typeof mt_showSelector === 'function') mt_showSelector();
+      }).catch(() => {
+        if (typeof mt_showSelector === 'function') mt_showSelector();
+      });
+    } else {
+      mt_getTenants_async().catch(() => {});
+    }
 
     // Re-apply overrides AFTER all inline scripts have run
     // (index.html re-assigns these functions, undoing our earlier overrides)
