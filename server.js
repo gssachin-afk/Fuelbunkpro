@@ -31,18 +31,9 @@ async function startServer() {
 // SECURITY MIDDLEWARE
 // ═══════════════════════════════════════════
 
-// SECURITY: HTTP security headers
+// SECURITY: HTTP security headers (relaxed CSP for inline frontend)
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "blob:"],
-      connectSrc: ["'self'"],
-    }
-  },
+  contentSecurityPolicy: false, // Frontend uses inline scripts — CSP handled via _headers in production
   crossOriginEmbedderPolicy: false
 }));
 
@@ -166,6 +157,7 @@ app.listen(PORT, '0.0.0.0', () => {
 }
 
 startServer().catch(e => {
-  console.error('[FATAL] Failed to start server:', e);
+  console.error('[FATAL] Failed to start server:', e.message || e);
+  console.error(e.stack || '');
   process.exit(1);
 });

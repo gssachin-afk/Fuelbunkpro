@@ -6,6 +6,24 @@ const fs = require('fs');
 const DB_DIR = process.env.DB_DIR || path.join(__dirname, '..', 'data');
 const DB_PATH = path.join(DB_DIR, 'fuelbunk.db');
 
+// Verify directory is writable, fallback to /tmp if not
+function ensureDbDir() {
+  const dirs = [DB_DIR, path.join(process.cwd(), 'data'), '/tmp/fuelbunk-data'];
+  for (const dir of dirs) {
+    try {
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      // Test write access
+      const testFile = path.join(dir, '.write-test');
+      fs.writeFileSync(testFile, 'ok');
+      fs.unlinkSync(testFile);
+      return dir;
+    } catch (e) {
+      console.warn('[DB] Directory not writable:', dir, e.message);
+    }
+  }
+  throw new Error('No writable directory found for database');
+}
+
 function hashPassword(password) {
   return crypto.createHash('sha256').update(password).digest('hex');
 }
@@ -90,19 +108,34 @@ class SQLiteDB {
 }
 
 async function initDatabase() {
-  if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true });
-  const SQL = await initSqlJs();
+  const dbDir = ensureDbDir();
+  const dbPath = path.join(dbDir, 'fuelbunk.db');
+  console.log('[DB] Using directory:', dbDir);
+  
+  // Locate WASM file explicitly for Docker/production environments
+  const SQL = await initSqlJs({
+    locateFile: file => {
+      const locations = [
+        path.join(__dirname, '..', 'node_modules', 'sql.js', 'dist', file),
+        path.join(process.cwd(), 'node_modules', 'sql.js', 'dist', file),
+      ];
+      for (const loc of locations) {
+        if (fs.existsSync(loc)) return loc;
+      }
+      return file; // fallback to default resolution
+    }
+  });
 
   let rawDb;
-  if (fs.existsSync(DB_PATH)) {
-    rawDb = new SQL.Database(fs.readFileSync(DB_PATH));
-    console.log('[DB] Loaded from', DB_PATH);
+  if (fs.existsSync(dbPath)) {
+    rawDb = new SQL.Database(fs.readFileSync(dbPath));
+    console.log("[DB] Loaded from", dbPath);
   } else {
     rawDb = new SQL.Database();
     console.log('[DB] Created new database');
   }
 
-  const db = new SQLiteDB(rawDb, DB_PATH);
+  const db = new SQLiteDB(rawDb, dbPath);
   db.pragma('foreign_keys = ON');
 
   // Create all tables
