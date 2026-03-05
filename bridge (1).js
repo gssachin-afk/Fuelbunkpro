@@ -364,8 +364,9 @@
       if (typeof mt_showSelector === 'function') mt_showSelector();
     }).catch(() => {});
 
-    // Re-apply super login override AFTER all inline scripts have run
-    // (index.html re-assigns window.mt_doSuperLogin at line 3863, undoing our override)
+    // Re-apply overrides AFTER all inline scripts have run
+    // (index.html re-assigns these functions, undoing our earlier overrides)
+
     window.mt_doSuperLogin = async function() {
       const userEl = document.getElementById('superUser');
       const passEl = document.getElementById('superPass');
@@ -379,6 +380,10 @@
       try {
         const result = await AuthAPI.superLogin(username, password);
         if (result.success) {
+          // Save token to storage so mt_saveTenant and page-refresh can find it
+          sessionStorage.setItem('fb_super_token', result.token);
+          localStorage.setItem('fb_super_token', result.token);
+          setAuthToken(result.token);
           localStorage.setItem('fb_super_session', JSON.stringify({ loggedIn: true, at: Date.now() }));
           if (typeof mt_toast === 'function') mt_toast('Super Admin logged in', 'success');
           await mt_getTenants_async();
@@ -386,6 +391,46 @@
         }
       } catch (e) {
         if (typeof mt_toast === 'function') mt_toast(e.message || 'Login failed', 'error');
+      }
+    };
+
+    // Re-apply mt_saveTenant — index.html overwrites this too
+    window.mt_saveTenant = async function(isEdit) {
+      const name      = document.getElementById('tName')?.value?.trim();
+      const location  = document.getElementById('tLocation')?.value?.trim();
+      const ownerName = document.getElementById('tOwner')?.value?.trim();
+      const phone     = document.getElementById('tPhone')?.value?.trim();
+      const icon      = document.getElementById('tIcon')?.value || '⛽';
+      const id        = document.getElementById('tId')?.value;
+      const adminUser = document.getElementById('tAdminUser')?.value?.trim() || 'admin';
+      const adminPass = document.getElementById('tAdminPass')?.value || 'admin123';
+
+      if (!name || name.length < 2) { if (typeof mt_toast === 'function') mt_toast('Enter a station name', 'error'); return; }
+
+      // Restore token if cleared from memory
+      if (!getAuthToken()) {
+        const saved = sessionStorage.getItem('fb_super_token') || localStorage.getItem('fb_super_token');
+        if (saved) {
+          setAuthToken(saved);
+        } else {
+          if (typeof mt_toast === 'function') mt_toast('Session expired. Please log in again.', 'error');
+          if (typeof mt_showSelector === 'function') mt_showSelector();
+          return;
+        }
+      }
+
+      try {
+        if (isEdit && id) {
+          await TenantAPI.update(id, { name, location, ownerName, phone, icon });
+          if (typeof mt_toast === 'function') mt_toast(name + ' updated', 'success');
+        } else {
+          await TenantAPI.create({ name, location, ownerName, phone, icon, adminUser, adminPass });
+          if (typeof mt_toast === 'function') mt_toast(name + ' created!', 'success');
+        }
+        await mt_getTenants_async();
+        if (typeof mt_showSelector === 'function') mt_showSelector();
+      } catch (e) {
+        if (typeof mt_toast === 'function') mt_toast(e.message || 'Failed to save', 'error');
       }
     };
   });
