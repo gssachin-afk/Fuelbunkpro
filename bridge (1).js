@@ -42,6 +42,8 @@
   window.mt_getTenants_async = async function() {
     try {
       const tenants = await TenantAPI.list();
+      // Normalize active field: SQLite returns 0/1, frontend expects true/false
+      tenants.forEach(t => { t.active = t.active === 1 || t.active === true; });
       _tenantCache = tenants;
       _tenantCacheTime = Date.now();
       // Also update localStorage as cache
