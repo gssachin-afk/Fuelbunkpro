@@ -452,9 +452,11 @@ function convertSql(sql, mode) {
   sql = sql.replace(/INSERT OR REPLACE INTO (\w+)/gi, 'INSERT INTO $1');
   // INSERT OR IGNORE → INSERT ... ON CONFLICT DO NOTHING
   sql = sql.replace(/INSERT OR IGNORE INTO (\w+)/gi, 'INSERT INTO $1');
-  // Add RETURNING id for INSERT statements so lastInsertRowid works
+  // Add RETURNING * for INSERT statements so lastInsertRowid works.
+  // Use RETURNING * (not RETURNING id) because some tables use non-id primary keys
+  // e.g. sessions uses token TEXT PRIMARY KEY — RETURNING id would crash those.
   if (mode === 'run' && sql.trim().toUpperCase().startsWith('INSERT') && !sql.includes('RETURNING')) {
-    sql = sql + ' RETURNING id';
+    sql = sql + ' RETURNING *';
   }
   return sql;
 }
