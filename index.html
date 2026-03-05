@@ -4036,8 +4036,10 @@ function toggleSidebar() {
 // ── CLOCK ────────────────────────────────────────────────────
 function updateClock() {
   const n = new Date();
-  document.getElementById('clock').textContent = n.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
-  document.getElementById('dateEl').textContent = n.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+  const clockEl = document.getElementById('clock');
+  const dateEl = document.getElementById('dateEl');
+  if (clockEl) clockEl.textContent = n.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+  if (dateEl) dateEl.textContent = n.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
 // ── RENDER ───────────────────────────────────────────────────
