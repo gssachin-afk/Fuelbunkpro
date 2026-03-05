@@ -33,19 +33,24 @@ async function startServer() {
     : __dirname;
 
   app.use(express.static(publicDir, {
-    maxAge: '1d',
+    maxAge: 0,
     setHeaders: (res, fp) => {
-      if (fp.endsWith('.html')) {
-        // HTML: revalidate on each request but don't block caching entirely
-        res.setHeader('Cache-Control', 'no-cache');
-      } else if (fp.endsWith('.js') || fp.endsWith('.css')) {
-        res.setHeader('Cache-Control', 'public, max-age=86400');
-      }
+      if (fp.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     }
   }));
 
   app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', database: 'postgresql', uptime: process.uptime() });
+  });
+
+  // Public: station list — needed before login so selector screen works without a token
+  app.get('/api/tenants/list', async (req, res) => {
+    try {
+      const tenants = await db.prepare(
+        'SELECT id, name, location, icon, color, color_light, active, station_code FROM tenants ORDER BY name'
+      ).all();
+      res.json(tenants);
+    } catch (e) { res.status(500).json({ error: e.message }); }
   });
 
   const authLimiter = rateLimit({ windowMs: 300000, max: 30 });
