@@ -990,7 +990,29 @@ async function mt_saveTenant(isEdit) {
   const ownerName= document.getElementById('tOwner')?.value?.trim();
   const phone    = document.getElementById('tPhone')?.value?.trim();
   const icon     = document.getElementById('tIcon')?.value || '⛽';
+  const adminUser= document.getElementById('tAdminUser')?.value?.trim() || 'admin';
+  const adminPass= document.getElementById('tAdminPass')?.value || 'admin123';
   if (!name || name.length < 2) { mt_toast('Enter a station name', 'error'); return; }
+
+  // Use API if available
+  if (typeof TenantAPI !== 'undefined') {
+    try {
+      if (isEdit && id) {
+        await TenantAPI.update(id, { name, location, ownerName, phone, icon });
+        mt_toast(name + ' updated', 'success');
+      } else {
+        await TenantAPI.create({ name, location, ownerName, phone, icon, adminUser, adminPass });
+        mt_toast(name + ' created!', 'success');
+      }
+      if (typeof mt_getTenants_async === 'function') await mt_getTenants_async();
+      mt_showSelector();
+    } catch(e) {
+      mt_toast(e.message || 'Failed to save', 'error');
+    }
+    return;
+  }
+
+  // Fallback: localStorage
   const tenants = mt_getTenants();
   const colors = [['#d4940f','#f0b429'],['#3b82f6','#60a5fa'],['#22c55e','#4ade80'],['#a855f7','#c084fc'],['#ef4444','#f87171'],['#06b6d4','#22d3ee']];
   const colorIdx = tenants.length % colors.length;
@@ -999,18 +1021,16 @@ async function mt_saveTenant(isEdit) {
     if (idx === -1) { mt_toast('Station not found', 'error'); return; }
     tenants[idx] = { ...tenants[idx], name, location, ownerName, phone, icon };
     mt_saveTenants(tenants);
-    mt_toast(`${name} updated`, 'success');
+    mt_toast(name + ' updated', 'success');
     mt_showSelector();
   } else {
     if (tenants.find(t => t.name.toLowerCase() === name.toLowerCase())) { mt_toast('A station with this name already exists', 'error'); return; }
-    const adminUser = document.getElementById('tAdminUser')?.value?.trim() || 'admin';
-    const adminPass = document.getElementById('tAdminPass')?.value || 'admin123';
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(adminPass));
     const adminPassHash = Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
     const newTenant = { id, name, location, ownerName, phone, icon, color: colors[colorIdx][0], colorLight: colors[colorIdx][1], createdAt: new Date().toISOString(), active: true, adminUsers: [{ id: 1, name: ownerName || 'Owner', username: adminUser, passHash: adminPassHash, role: 'Owner' }] };
     tenants.push(newTenant);
     mt_saveTenants(tenants);
-    mt_toast(`${name} created!`, 'success');
+    mt_toast(name + ' created!', 'success');
     mt_showSelector();
   }
 }
