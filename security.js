@@ -1,29 +1,7 @@
 /**
- * FuelBunk Pro — Security Middleware
- * Rate limiting, authentication, input sanitization, audit logging
+ * FuelBunk Pro — Security Middleware (PostgreSQL async version)
  */
 const crypto = require('crypto');
-
-// ═══════════════════════════════════════════
-// INPUT SANITIZER
-// ═══════════════════════════════════════════
-const SQL_PATTERNS = [
-  /(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION)\b\s+(INTO|FROM|TABLE|SET|ALL|VALUES|DATABASE)\b)/gi,
-  /(--|\/\*|\*\/)/g,
-  /(\b(OR|AND)\b\s+\d+\s*=\s*\d+)/gi,
-  /('\s*(OR|AND|UNION|SELECT|DROP)\b)/gi,
-  /(;\s*(DROP|DELETE|INSERT|UPDATE|SELECT|EXEC)\b)/gi,
-  /(SLEEP\s*\(|BENCHMARK\s*\(|WAITFOR\s+DELAY)/gi
-];
-
-function detectThreats(str) {
-  if (typeof str !== 'string') return [];
-  const threats = [];
-  SQL_PATTERNS.forEach(p => { if (p.test(str)) threats.push('SQL_INJECTION'); p.lastIndex = 0; });
-  if (/<script|javascript:|on\w+\s*=/i.test(str)) threats.push('XSS');
-  if (/\$(?:gt|gte|lt|lte|ne|eq|regex|where)/i.test(str)) threats.push('NOSQL_INJECTION');
-  return [...new Set(threats)];
-}
 
 function sanitizeString(str, maxLen = 1000) {
   if (typeof str !== 'string') return '';
@@ -47,30 +25,20 @@ function sanitizeObject(obj, depth = 0) {
   return null;
 }
 
-// Middleware: sanitize all request bodies
 function inputSanitizerMiddleware(req, res, next) {
-  if (req.body && typeof req.body === 'object') {
-    // Check for injection threats in all string values
-    const allStrings = JSON.stringify(req.body);
-    const threats = detectThreats(allStrings);
-    if (threats.length > 0) {
-      // Log the attempt
-      auditLog(req, 'INJECTION_ATTEMPT', 'security', '', threats.join(','));
-      return res.status(400).json({ error: 'Invalid input detected' });
-    }
-    req.body = sanitizeObject(req.body);
-  }
+  if (req.body && typeof req.body === 'object') req.body = sanitizeObject(req.body);
   next();
 }
 
-// ═══════════════════════════════════════════
-// AUTHENTICATION MIDDLEWARE
-// ═══════════════════════════════════════════
+function generateToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
 function authMiddleware(db) {
-  return (req, res, next) => {
-    // Skip auth for login/public routes
-    const publicPaths = ['/api/auth/login', '/api/auth/super-login', '/api/tenants/list', '/api/health'];
+  return async (req, res, next) => {
+    const publicPaths = ['/api/auth/login', '/api/auth/super-login', '/api/health'];
     if (publicPaths.some(p => req.path.startsWith(p))) return next();
+    if (req.path === '/api/tenants' && req.method === 'GET') return next();
 
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -78,26 +46,27 @@ function authMiddleware(db) {
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const session = db.prepare(
-      "SELECT * FROM sessions WHERE token = ? AND expires_at > datetime('now')"
-    ).get(token);
+    try {
+      const session = await db.prepare(
+        "SELECT * FROM sessions WHERE token = $1 AND expires_at > NOW()"
+      ).get(token);
 
-    if (!session) {
-      return res.status(401).json({ error: 'Invalid or expired session' });
+      if (!session) return res.status(401).json({ error: 'Invalid or expired session' });
+
+      req.session = session;
+      req.tenantId = session.tenant_id;
+      req.userId = session.user_id;
+      req.userType = session.user_type;
+      req.userName = session.user_name;
+      req.userRole = session.role;
+      next();
+    } catch (e) {
+      console.error('[Auth]', e.message);
+      return res.status(500).json({ error: 'Auth error' });
     }
-
-    // Attach session info to request
-    req.session = session;
-    req.tenantId = session.tenant_id;
-    req.userId = session.user_id;
-    req.userType = session.user_type;
-    req.userName = session.user_name;
-    req.userRole = session.role;
-    next();
   };
 }
 
-// Role check middleware
 function requireRole(...roles) {
   return (req, res, next) => {
     if (!req.userType) return res.status(401).json({ error: 'Not authenticated' });
@@ -108,130 +77,55 @@ function requireRole(...roles) {
   };
 }
 
-// ═══════════════════════════════════════════
-// BRUTE FORCE PROTECTION
-// ═══════════════════════════════════════════
 function bruteForceCheck(db) {
-  return (req, res, next) => {
+  return async (req, res, next) => {
     const ip = req.ip || req.headers['x-forwarded-for'] || 'unknown';
-    const windowMinutes = 5;
-    const maxAttempts = 10;
-    const lockoutMinutes = 15;
-
-    // Count recent failed attempts from this IP
-    const count = db.prepare(`
-      SELECT COUNT(*) as cnt FROM login_attempts
-      WHERE ip_address = ? AND success = 0
-      AND attempted_at > datetime('now', ?)
-    `).get(ip, `-${windowMinutes} minutes`);
-
-    if (count && count.cnt >= maxAttempts) {
-      // Check if lockout has expired
-      const latest = db.prepare(`
-        SELECT attempted_at FROM login_attempts
-        WHERE ip_address = ? AND success = 0
-        ORDER BY attempted_at DESC LIMIT 1
-      `).get(ip);
-
-      return res.status(429).json({
-        error: 'Too many login attempts',
-        retryAfter: lockoutMinutes * 60,
-        message: `Account locked. Try again in ${lockoutMinutes} minutes.`
-      });
-    }
-
+    try {
+      const result = await db.prepare(
+        "SELECT COUNT(*) as cnt FROM login_attempts WHERE ip_address = $1 AND success = 0 AND attempted_at > NOW() - INTERVAL '5 minutes'"
+      ).get(ip);
+      if (result && parseInt(result.cnt) >= 10) {
+        return res.status(429).json({ error: 'Too many login attempts. Try again in 15 minutes.' });
+      }
+    } catch (e) {}
     req._bruteForceIp = ip;
     next();
   };
 }
 
-function recordLoginAttempt(db, ip, username, tenantId, success) {
-  db.prepare(`
-    INSERT INTO login_attempts (ip_address, username, tenant_id, success)
-    VALUES (?, ?, ?, ?)
-  `).run(ip, username || '', tenantId || '', success ? 1 : 0);
-
-  // Clean old attempts (keep last 24 hours)
-  db.prepare("DELETE FROM login_attempts WHERE attempted_at < datetime('now', '-24 hours')").run();
+async function recordLoginAttempt(db, ip, username, tenantId, success) {
+  try {
+    await db.prepare('INSERT INTO login_attempts (ip_address, username, tenant_id, success) VALUES ($1, $2, $3, $4)')
+      .run(ip || '', username || '', tenantId || '', success ? 1 : 0);
+  } catch (e) {}
 }
 
-// ═══════════════════════════════════════════
-// AUDIT LOGGING
-// ═══════════════════════════════════════════
-function auditLog(req, action, entity = '', entityId = '', details = '') {
+async function auditLog(req, action, entity = '', entityId = '', details = '') {
   try {
     const db = req.app?.locals?.db;
     if (!db) return;
-    db.prepare(`
-      INSERT INTO audit_log (tenant_id, user_name, user_type, action, entity, entity_id, details, ip_address)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      req.tenantId || '',
-      req.userName || '',
-      req.userType || '',
-      action,
-      entity,
-      String(entityId),
-      typeof details === 'object' ? JSON.stringify(details) : String(details),
-      req.ip || ''
-    );
-  } catch (e) {
-    console.error('[Audit] Failed to log:', e.message);
-  }
+    await db.prepare('INSERT INTO audit_log (tenant_id, user_name, user_type, action, entity, entity_id, details, ip_address) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)')
+      .run(req.tenantId||'', req.userName||'', req.userType||'', action, entity, String(entityId||''), String(details||''), req.ip||'');
+  } catch (e) {}
 }
 
-// Middleware: auto-audit write operations
-function auditMiddleware(req, res, next) {
-  if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
-    const originalJson = res.json.bind(res);
-    res.json = function (body) {
-      if (res.statusCode >= 200 && res.statusCode < 300) {
-        const entity = req.path.split('/').filter(Boolean).pop() || 'unknown';
-        auditLog(req, `${req.method} ${req.path}`, entity, body?.id || '', '');
-      }
-      return originalJson(body);
-    };
-  }
-  next();
-}
-
-// ═══════════════════════════════════════════
-// SESSION MANAGEMENT
-// ═══════════════════════════════════════════
-function generateToken() {
-  return crypto.randomBytes(48).toString('hex');
-}
-
-function createSession(db, { tenantId, userId, userType, userName, role, ip, userAgent }) {
+async function createSession(db, { tenantId, userId, userType, userName, role, ip, userAgent }) {
   const token = generateToken();
   const hours = userType === 'super' ? 4 : 12;
-  db.prepare(`
-    INSERT INTO sessions (token, tenant_id, user_id, user_type, user_name, role, expires_at, ip_address, user_agent)
-    VALUES (?, ?, ?, ?, ?, ?, datetime('now', ?), ?, ?)
-  `).run(token, tenantId || '', userId || 0, userType, userName || '', role || '', `+${hours} hours`, ip || '', userAgent || '');
-
-  // Clean expired sessions
-  db.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')").run();
-
+  await db.prepare(
+    `INSERT INTO sessions (token, tenant_id, user_id, user_type, user_name, role, expires_at, ip_address, user_agent) VALUES ($1, $2, $3, $4, $5, $6, NOW() + INTERVAL '${hours} hours', $7, $8)`
+  ).run(token, tenantId||'', userId||0, userType, userName||'', role||'', ip||'', userAgent||'');
+  try { await db.prepare("DELETE FROM sessions WHERE expires_at < NOW()").run(); } catch {}
   return token;
 }
 
-function destroySession(db, token) {
-  db.prepare('DELETE FROM sessions WHERE token = ?').run(token);
+async function destroySession(db, token) {
+  try { await db.prepare('DELETE FROM sessions WHERE token = $1').run(token); } catch {}
 }
 
 module.exports = {
-  inputSanitizerMiddleware,
-  authMiddleware,
-  requireRole,
-  bruteForceCheck,
-  recordLoginAttempt,
-  auditLog,
-  auditMiddleware,
-  generateToken,
-  createSession,
-  destroySession,
-  sanitizeString,
-  sanitizeObject,
-  detectThreats
+  inputSanitizerMiddleware, authMiddleware, requireRole,
+  bruteForceCheck, recordLoginAttempt, auditLog,
+  generateToken, createSession, destroySession,
+  sanitizeString, sanitizeObject,
 };
