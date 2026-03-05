@@ -43,9 +43,26 @@ async function startServer() {
     res.json({ status: 'ok', database: 'postgresql', uptime: process.uptime() });
   });
 
+  // Public tenant list aliases (supports both legacy and new frontend clients)
+  const listTenantsPublic = async (req, res) => {
+    try {
+      const tenants = await db.prepare(
+        'SELECT id, name, location, icon, color, color_light, active, station_code FROM tenants ORDER BY name'
+      ).all();
+      res.json(tenants);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  };
+
+  app.get(['/api/tenants', '/api/tenants/list', '/api/data/tenants', '/api/data/tenants/list'], listTenantsPublic);
+
   const authLimiter = rateLimit({ windowMs: 300000, max: 30 });
   app.use('/api/auth', authLimiter, authRoutes(db));
+
+  // Keep legacy /api/data/* and new /api/* route styles working together.
   app.use('/api/data', authMiddleware(db), dataRoutes(db));
+  app.use('/api', authMiddleware(db), dataRoutes(db));
 
   app.get('*', (req, res) => {
     if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'Not found' });
