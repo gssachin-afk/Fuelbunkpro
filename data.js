@@ -3,8 +3,8 @@
  * Generic CRUD matching FuelDB interface + tenant management
  */
 const express = require('express');
-const { hashPassword } = require('../db/schema');
-const { requireRole, auditLog, sanitizeString } = require('../middleware/security');
+const { hashPassword } = require('./schema');
+const { requireRole, auditLog, sanitizeString } = require('./security');
 
 // Map frontend store names → SQL tables + their key columns
 const STORE_MAP = {
