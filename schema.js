@@ -85,11 +85,11 @@ function createSchema(db) {
 function seedData(db) {
   const existing = db.prepare('SELECT id FROM super_admin WHERE id = 1').get();
   if (!existing) {
-    db.prepare('INSERT INTO super_admin (id, username, pass_hash, updated_at) VALUES (?, ?, ?, datetime("now"))')
-      .run(1, 'superadmin', hashPassword('FuelBunk@Super2026'));
+    db.prepare('INSERT INTO super_admin (id, username, pass_hash, updated_at) VALUES (?, ?, ?, ?)')
+      .run(1, 'superadmin', hashPassword('FuelBunk@Super2026'), new Date().toISOString());
     console.log('[DB] Seeded: superadmin / FuelBunk@Super2026');
   }
-  try { db.prepare("DELETE FROM sessions WHERE expires_at < datetime('now')").run(); } catch {}
+  try { db.prepare("DELETE FROM sessions WHERE expires_at < ?").run(new Date().toISOString()); } catch {}
 }
 
 function wrapSqlJs(rawDb, filePath) {
