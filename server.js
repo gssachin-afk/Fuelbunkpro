@@ -33,9 +33,14 @@ async function startServer() {
     : __dirname;
 
   app.use(express.static(publicDir, {
-    maxAge: 0,
+    maxAge: '1d',
     setHeaders: (res, fp) => {
-      if (fp.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      if (fp.endsWith('.html')) {
+        // HTML: revalidate on each request but don't block caching entirely
+        res.setHeader('Cache-Control', 'no-cache');
+      } else if (fp.endsWith('.js') || fp.endsWith('.css')) {
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+      }
     }
   }));
 
