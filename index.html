@@ -1464,7 +1464,7 @@ function mt_getTenantAdminUsers(tenantId) {
 const DB_NAME = 'FuelBunkPro'; // Will be overridden per-tenant below
 const DB_VERSION = 4;
 
-class FuelDB {
+class FuelDB_IDB {
   constructor(dbName) {
     this.db = null;
     this.ready = this.init(dbName);
@@ -1618,7 +1618,7 @@ const _activeTenant = (function() {
   try { return JSON.parse(localStorage.getItem('fb_active_tenant') || 'null'); } catch { return null; }
 })();
 const _tenantDbName = _activeTenant ? ('FuelBunkPro_' + _activeTenant.id) : 'FuelBunkPro_demo';
-try { window.db = new FuelDB(_tenantDbName); } catch(e) { console.warn('FuelDB init error:', e); window.db = null; }
+try { window.db = new FuelDB_IDB(_tenantDbName); } catch(e) { console.warn('FuelDB init error:', e); window.db = null; }
 
 // ═══════════════════════════════════════════════════════════
 // FUELBUNK PRO — Utilities
