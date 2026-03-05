@@ -139,48 +139,48 @@ const AuthAPI = {
 // ═══════════════════════════════════════════
 const TenantAPI = {
   async list() {
-    return apiFetch('/tenants/list');
+    return apiFetch('/tenants');
   },
 
   async create(data) {
-    return apiFetch('/data/tenants', {
+    return apiFetch('/tenants', {
       method: 'POST',
       body: JSON.stringify(data)
     });
   },
 
   async update(id, data) {
-    return apiFetch('/data/tenants/' + id, {
+    return apiFetch('/tenants/' + id, {
       method: 'PUT',
       body: JSON.stringify(data)
     });
   },
 
   async remove(id) {
-    return apiFetch('/data/tenants/' + id, {
+    return apiFetch('/tenants/' + id, {
       method: 'DELETE'
     });
   },
 
   async getAdmins(tenantId) {
-    return apiFetch('/data/tenants/' + tenantId + '/admins');
+    return apiFetch('/tenants/' + tenantId + '/admins');
   },
 
   async addAdmin(tenantId, data) {
-    return apiFetch('/data/tenants/' + tenantId + '/admins', {
+    return apiFetch('/tenants/' + tenantId + '/admins', {
       method: 'POST',
       body: JSON.stringify(data)
     });
   },
 
   async removeAdmin(tenantId, userId) {
-    return apiFetch('/data/tenants/' + tenantId + '/admins/' + userId, {
+    return apiFetch('/tenants/' + tenantId + '/admins/' + userId, {
       method: 'DELETE'
     });
   },
 
   async resetAdminPassword(tenantId, userId, newPassword) {
-    return apiFetch('/data/tenants/' + tenantId + '/admins/' + userId + '/reset-password', {
+    return apiFetch('/tenants/' + tenantId + '/admins/' + userId + '/reset-password', {
       method: 'POST',
       body: JSON.stringify({ newPassword })
     });
@@ -201,7 +201,7 @@ class FuelDB {
   // Get all records from a store
   async getAll(storeName) {
     try {
-      return await apiFetch('/data/' + storeName);
+      return await apiFetch('/' + storeName);
     } catch (e) {
       console.warn('[FuelDB] getAll error:', storeName, e.message);
       return [];
@@ -211,7 +211,7 @@ class FuelDB {
   // Get a single record by key
   async get(storeName, key) {
     try {
-      return await apiFetch('/data/' + storeName + '/' + encodeURIComponent(key));
+      return await apiFetch('/' + storeName + '/' + encodeURIComponent(key));
     } catch (e) {
       return undefined;
     }
@@ -219,7 +219,7 @@ class FuelDB {
 
   // Put (upsert) a record
   async put(storeName, data) {
-    const result = await apiFetch('/data/' + storeName, {
+    const result = await apiFetch('/' + storeName, {
       method: 'PUT',
       body: JSON.stringify(data)
     });
@@ -228,7 +228,7 @@ class FuelDB {
 
   // Add a new record (auto-increment ID)
   async add(storeName, data) {
-    const result = await apiFetch('/data/' + storeName, {
+    const result = await apiFetch('/' + storeName, {
       method: 'POST',
       body: JSON.stringify(data)
     });
@@ -237,14 +237,14 @@ class FuelDB {
 
   // Delete a record by key
   async delete(storeName, key) {
-    await apiFetch('/data/' + storeName + '/' + encodeURIComponent(key), {
+    await apiFetch('/' + storeName + '/' + encodeURIComponent(key), {
       method: 'DELETE'
     });
   }
 
   // Clear all records in a store
   async clear(storeName) {
-    await apiFetch('/data/' + storeName, {
+    await apiFetch('/' + storeName, {
       method: 'DELETE'
     });
   }
@@ -259,7 +259,7 @@ class FuelDB {
   async getByIndex(storeName, indexName, value) {
     try {
       return await apiFetch(
-        '/data/' + storeName + '/by-index/' +
+        '/' + storeName + '/by-index/' +
         encodeURIComponent(indexName) + '/' +
         encodeURIComponent(value)
       );
@@ -270,7 +270,7 @@ class FuelDB {
 
   // Bulk insert/update
   async bulkPut(storeName, items) {
-    await apiFetch('/data/' + storeName + '/bulk', {
+    await apiFetch('/' + storeName + '/bulk', {
       method: 'PUT',
       body: JSON.stringify(items)
     });
@@ -279,7 +279,7 @@ class FuelDB {
   // Settings helpers
   async getSetting(key, defaultVal = null) {
     try {
-      const result = await apiFetch('/data/settings/key/' + encodeURIComponent(key));
+      const result = await apiFetch('/settings/key/' + encodeURIComponent(key));
       return result.value !== null ? result.value : defaultVal;
     } catch {
       return defaultVal;
@@ -287,7 +287,7 @@ class FuelDB {
   }
 
   async setSetting(key, value) {
-    await apiFetch('/data/settings/key/' + encodeURIComponent(key), {
+    await apiFetch('/settings/key/' + encodeURIComponent(key), {
       method: 'PUT',
       body: JSON.stringify({ value })
     });
