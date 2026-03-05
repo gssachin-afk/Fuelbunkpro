@@ -42,6 +42,8 @@
   window.mt_getTenants_async = async function() {
     try {
       const tenants = await TenantAPI.list();
+      // Normalize active field: SQLite returns 0/1, frontend expects true/false
+      tenants.forEach(t => { t.active = t.active === 1 || t.active === true; });
       _tenantCache = tenants;
       _tenantCacheTime = Date.now();
       // Also update localStorage as cache
@@ -206,6 +208,29 @@
   // ═══════════════════════════════════════════
   // The original appLogin function will need to call AuthAPI
   // We patch the credential verification part
+
+  // Override mt_toggleStation — sync active status to server
+  const _origToggleStation = window.mt_toggleStation;
+  window.mt_toggleStation = async function(id) {
+    const tenants = mt_getTenants();
+    const t = tenants.find(x => x.id === id);
+    if (!t) return;
+    const newActive = t.active === false ? true : false;
+    try {
+      await TenantAPI.update(id, { active: newActive });
+    } catch(e) {
+      console.warn('[Bridge] Failed to update station active status on server:', e.message);
+    }
+    // Also update localStorage immediately for UI
+    if (_origToggleStation) _origToggleStation(id);
+    else {
+      tenants.find(x => x.id === id).active = newActive;
+      localStorage.setItem('fb_tenants', JSON.stringify(tenants));
+      mt_showSelector();
+    }
+    // Refresh from server
+    mt_getTenants_async().then(() => mt_showSelector()).catch(()=>{});
+  };
 
   // Override doAdminLogin — used by station selector login screen
   window.doAdminLogin = async function() {
