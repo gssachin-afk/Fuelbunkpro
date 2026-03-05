@@ -299,8 +299,10 @@
     const savedToken = sessionStorage.getItem('fb_super_token');
     if (savedToken) setAuthToken(savedToken);
 
-    // Fetch tenants from server in background
-    mt_getTenants_async().catch(() => {});
+    // Fetch tenants from server and refresh UI when done
+    mt_getTenants_async().then(() => {
+      if (typeof mt_showSelector === 'function') mt_showSelector();
+    }).catch(() => {});
 
     // Re-apply super login override AFTER all inline scripts have run
     // (index.html re-assigns window.mt_doSuperLogin at line 3863, undoing our override)
