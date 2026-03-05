@@ -33,16 +33,7 @@ async function startServer() {
 
 // SECURITY: HTTP security headers
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "blob:"],
-      connectSrc: ["'self'"],
-    }
-  },
+  contentSecurityPolicy: false,  // Disabled: app uses inline handlers and scripts
   crossOriginEmbedderPolicy: false
 }));
 
