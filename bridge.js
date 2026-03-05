@@ -206,6 +206,40 @@
   // The original appLogin function will need to call AuthAPI
   // We patch the credential verification part
 
+  // Override doAdminLogin — used by station selector login screen
+  window.doAdminLogin = async function() {
+    const user = document.getElementById('adminUser')?.value?.trim()?.toLowerCase();
+    const pass = document.getElementById('adminPass')?.value;
+
+    if (!user || !pass) { if(typeof toast==='function') toast('Enter credentials', 'error'); return; }
+
+    const tenant = mt_getActiveTenant();
+    if (!tenant) { if(typeof toast==='function') toast('No station selected', 'error'); return; }
+
+    try {
+      const result = await AuthAPI.adminLogin(user, pass, tenant.id);
+      if (result.success) {
+        setAuthToken(result.token);
+        sessionStorage.setItem('fb_super_token', sessionStorage.getItem('fb_super_token') || '');
+        sessionStorage.setItem('fb_session', JSON.stringify({
+          loggedIn: true, role: result.userRole || 'admin',
+          adminUser: { name: result.userName, username: user, role: result.userRole },
+          tenant: tenant, token: result.token
+        }));
+        APP.loggedIn = true;
+        APP.role = result.userRole || 'admin';
+        APP.adminUser = { name: result.userName, username: user, role: result.userRole };
+        APP.tenant = tenant;
+        window.db = new FuelDB_IDB('FuelBunkPro_' + tenant.id);
+        setTenantId(tenant.id);
+        if (typeof enterApp === 'function') enterApp();
+        if (typeof toast === 'function') toast('Welcome, ' + result.userName, 'success');
+      }
+    } catch (e) {
+      if (typeof toast === 'function') toast(e.message || 'Invalid credentials', 'error');
+    }
+  };
+
   const _origAppLogin = window.appLogin;
   window.appLogin = async function() {
     const user = document.getElementById('loginUser')?.value?.trim()?.toLowerCase();
