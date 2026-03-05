@@ -5926,7 +5926,7 @@ function readEmpPermissions() {
   return perms;
 }
 
-function addEmployee() {
+async function addEmployee() {
   const name = document.getElementById('empName')?.value?.trim();
   const role = document.getElementById('empRole')?.value;
   const shiftEl = document.getElementById('empShift');
@@ -5942,12 +5942,17 @@ function addEmployee() {
     permissions,
     color: EMP_COLORS[APP.data.employees.length % EMP_COLORS.length]
   };
-  APP.data.employees.push(newEmp);
-  db.add('employees', newEmp).catch(() => {});
-  closeModal();
-  const granted = Object.entries(permissions).filter(([,v])=>v).map(([k])=>EMP_OPTIONAL_PERMISSIONS.find(p=>p.id===k)?.label).filter(Boolean);
-  toast(`${name} added · ${granted.length ? granted.join(', ') : 'No extra permissions'}`, 'success');
-  renderPage();
+  try {
+    const insertedId = await db.add('employees', newEmp);
+    if (insertedId !== undefined && insertedId !== null) newEmp.id = insertedId;
+    APP.data.employees.push(newEmp);
+    closeModal();
+    const granted = Object.entries(permissions).filter(([,v])=>v).map(([k])=>EMP_OPTIONAL_PERMISSIONS.find(p=>p.id===k)?.label).filter(Boolean);
+    toast(`${name} added · ${granted.length ? granted.join(', ') : 'No extra permissions'}`, 'success');
+    renderPage();
+  } catch (e) {
+    toast((e && e.message) ? e.message : 'Failed to save employee', 'error');
+  }
 }
 
 function openEditEmployeeModal(empId) {

@@ -256,7 +256,7 @@
         APP.role = 'admin';
         APP.adminUser = { name: result.userName, username: user, role: result.userRole };
         APP.tenant = tenant;
-        window.db = new FuelDB_IDB('FuelBunkPro_' + tenant.id);
+        window.db = new FuelDB('FuelBunkPro_' + tenant.id);
         setTenantId(tenant.id);
         if (typeof enterApp === 'function') enterApp();
         if (typeof toast === 'function') toast('Welcome, ' + result.userName, 'success');
