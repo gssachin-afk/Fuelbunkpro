@@ -248,12 +248,12 @@
         setAuthToken(result.token);
         sessionStorage.setItem('fb_super_token', sessionStorage.getItem('fb_super_token') || '');
         sessionStorage.setItem('fb_session', JSON.stringify({
-          loggedIn: true, role: result.userRole || 'admin',
+          loggedIn: true, role: 'admin',
           adminUser: { name: result.userName, username: user, role: result.userRole },
           tenant: tenant, token: result.token
         }));
         APP.loggedIn = true;
-        APP.role = result.userRole || 'admin';
+        APP.role = 'admin';
         APP.adminUser = { name: result.userName, username: user, role: result.userRole };
         APP.tenant = tenant;
         window.db = new FuelDB_IDB('FuelBunkPro_' + tenant.id);
@@ -321,7 +321,7 @@
       }
 
       APP.loggedIn = true;
-      APP.role = session.role;
+      APP.role = session.role === 'employee' ? 'employee' : 'admin';
       APP.adminUser = session.adminUser;
       APP.tenant = session.tenant;
 

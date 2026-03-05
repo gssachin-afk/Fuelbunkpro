@@ -6547,7 +6547,10 @@ function renderEmployeePortal() {
 
 // ── LOGIN ──
 function emp_renderLogin() {
-  const empOpts = EMP_LIST.map(e => `<option value="${e.id}">${e.name} — ${e.role}</option>`).join('');
+  const hasEmployees = EMP_LIST.length > 0;
+  const empOpts = hasEmployees
+    ? EMP_LIST.map(e => `<option value="${e.id}">${e.name} — ${e.role}</option>`).join('')
+    : `<option value="" selected disabled>No employees configured for this station</option>`;
 
   return `<div style="text-align:center;margin-bottom:24px;padding-top:16px">
     <div style="font-size:42px;margin-bottom:10px">🧑‍🔧</div>
@@ -6555,9 +6558,10 @@ function emp_renderLogin() {
     <p style="font-size:12px;color:var(--text-3)">${APP.tenant ? sanitize(APP.tenant.name) + (APP.tenant.location ? ', ' + sanitize(APP.tenant.location) : '') : 'FuelBunk Pro'}</p>
   </div>
   <div class="card"><div class="card-head"><h4>Login</h4>${badge(emp_today(),'badge-accent')}</div><div class="card-body">
-    <div class="form-group"><label class="form-label">Select Your Name</label><select class="form-input" id="empLoginName">${empOpts}</select></div>
+    <div class="form-group"><label class="form-label">Select Your Name</label><select class="form-input" id="empLoginName" ${hasEmployees ? '' : 'disabled'}>${empOpts}</select></div>
     <div class="form-group"><label class="form-label">Last 4 Digits of Phone (PIN)</label><input class="form-input" id="empLoginPin" type="tel" maxlength="4" placeholder="Enter 4-digit PIN" inputmode="numeric" autocomplete="off" /><div style="font-size:10px;color:var(--text-3);margin-top:4px">Use last 4 digits of registered mobile</div></div>
-    <button class="btn btn-accent btn-block" style="padding:14px;font-size:14px;margin-top:6px" onclick="emp_doLogin()">🔐 Login</button>
+    <button class="btn btn-accent btn-block" style="padding:14px;font-size:14px;margin-top:6px;${hasEmployees ? '' : 'opacity:0.6;cursor:not-allowed;'}" onclick="emp_doLogin()" ${hasEmployees ? '' : 'disabled'}>🔐 Login</button>
+    ${hasEmployees ? '' : '<div style="font-size:11px;color:var(--red);margin-top:8px">No employees configured. Ask admin to add staff in Staff & Allocation.</div>'}
   </div></div>`;
 }
 
@@ -7025,6 +7029,10 @@ function emp_renderComplete() {
 // ═══════════════════════════════════════════════════════════════
 
 async function emp_doLogin() {
+  if (!Array.isArray(EMP_LIST) || EMP_LIST.length === 0) {
+    toast('No employees configured for this station','error');
+    return;
+  }
   const id = parseInt(document.getElementById('empLoginName').value);
   const pin = document.getElementById('empLoginPin').value;
   const emp = EMP_LIST.find(e => e.id === id);
@@ -7580,8 +7588,12 @@ function showLoginScreen() {
 
   // Build options using string concat (safe from ordering issues)
   var empOpts = '';
+  var hasEmployees = EMP_LIST.length > 0;
   for (var i = 0; i < EMP_LIST.length; i++) {
     empOpts += '<option value="' + EMP_LIST[i].id + '">' + sanitize(EMP_LIST[i].name) + ' — ' + sanitize(EMP_LIST[i].role) + '</option>';
+  }
+  if (!hasEmployees) {
+    empOpts = '<option value="" disabled selected>No employees configured for this station</option>';
   }
 
   el.innerHTML =
@@ -7609,9 +7621,10 @@ function showLoginScreen() {
         '<div style="width:42px;height:42px;border-radius:10px;background:linear-gradient(135deg,var(--green),#34d399);display:grid;place-items:center;font-size:18px">\uD83E\uDDD1\u200D\uD83D\uDD27</div>' +
         '<div><div class="fw-800" style="color:var(--text-0);font-size:16px">Employee Login</div><div style="font-size:11px;color:var(--text-3)">Enter meter readings &amp; record sales</div></div>' +
       '</div>' +
-      '<div class="form-group"><label class="form-label">Select Your Name</label><select class="form-input" id="empLoginName2">' + empOpts + '</select></div>' +
+      '<div class="form-group"><label class="form-label">Select Your Name</label><select class="form-input" id="empLoginName2"' + (hasEmployees ? '' : ' disabled') + '>' + empOpts + '</select></div>' +
       '<div class="form-group"><label class="form-label">PIN (Last 4 digits of phone)</label><input class="form-input" id="empLoginPin2" type="tel" maxlength="4" placeholder="Enter 4-digit PIN" inputmode="numeric" autocomplete="off" onkeydown="if(event.key===\'Enter\')doEmpLogin()" /></div>' +
-      '<button class="btn btn-block" style="background:var(--green);color:#fff;padding:14px;font-size:14px;margin-top:6px" onclick="doEmpLogin()">\uD83E\uDDD1\u200D\uD83D\uDD27 Login</button>' +
+      '<button class="btn btn-block" style="background:var(--green);color:#fff;padding:14px;font-size:14px;margin-top:6px' + (hasEmployees ? '' : ';opacity:0.6;cursor:not-allowed') + '" onclick="doEmpLogin()"' + (hasEmployees ? '' : ' disabled') + '>\uD83E\uDDD1\u200D\uD83D\uDD27 Login</button>' +
+      (hasEmployees ? '' : '<div style="font-size:11px;color:var(--red);margin-top:8px">No employees configured. Ask admin to add staff in Staff & Allocation.</div>') +
     '</div>' +
     '<div class="login-footer">FuelBunk Pro v3.0 &copy; 2026 &nbsp;·&nbsp; <a href="#" onclick="mt_switchStation();return false;" style="color:var(--accent-light);text-decoration:none;font-weight:600;">🏪 Switch Station</a></div>' +
     '</div></div>';
@@ -7645,6 +7658,10 @@ async function doAdminLogin() {
 }
 
 async function doEmpLogin() {
+  if (!Array.isArray(EMP_LIST) || EMP_LIST.length === 0) {
+    toast('No employees configured for this station', 'error');
+    return;
+  }
   var id = parseInt(document.getElementById('empLoginName2').value);
   var pin = document.getElementById('empLoginPin2').value || '';
   var emp = null;
