@@ -27,8 +27,12 @@ async function startServer() {
   app.use(express.urlencoded({ extended: false }));
   app.use(inputSanitizerMiddleware);
 
-  // Serve frontend
-  app.use(express.static(path.join(__dirname, 'public'), {
+  // Serve frontend — index.html is in root directory
+  const publicDir = require('fs').existsSync(path.join(__dirname, 'public'))
+    ? path.join(__dirname, 'public')
+    : __dirname;
+
+  app.use(express.static(publicDir, {
     maxAge: 0,
     setHeaders: (res, fp) => {
       if (fp.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -45,7 +49,7 @@ async function startServer() {
 
   app.get('*', (req, res) => {
     if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'Not found' });
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    res.sendFile(path.join(publicDir, 'index.html'));
   });
 
   app.use((err, req, res, next) => {
