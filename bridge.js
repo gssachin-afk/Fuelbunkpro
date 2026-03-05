@@ -138,6 +138,18 @@
 
     if (!name || name.length < 2) { mt_toast('Enter a station name', 'error'); return; }
 
+    // Ensure token is set — restore from sessionStorage or re-authenticate
+    if (!getAuthToken()) {
+      const saved = sessionStorage.getItem('fb_super_token');
+      if (saved) {
+        setAuthToken(saved);
+      } else {
+        mt_toast('Session expired. Please log in again.', 'error');
+        mt_showSelector();
+        return;
+      }
+    }
+
     try {
       if (isEdit && id) {
         await TenantAPI.update(id, { name, location, ownerName, phone, icon });
