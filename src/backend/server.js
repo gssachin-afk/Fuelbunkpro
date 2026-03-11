@@ -5,6 +5,7 @@ const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+const fs = require('fs');
 const path = require('path');
 
 const { initDatabase } = require('./schema');
@@ -27,10 +28,12 @@ async function startServer() {
   app.use(express.urlencoded({ extended: false }));
   app.use(inputSanitizerMiddleware);
 
-  // Serve frontend — index.html is in root directory
-  const publicDir = require('fs').existsSync(path.join(__dirname, 'public'))
-    ? path.join(__dirname, 'public')
-    : __dirname;
+  // Serve frontend from src/frontend, with legacy public fallback.
+  const candidatePublicDirs = [
+    path.resolve(__dirname, '../frontend'),
+    path.resolve(__dirname, '../../public'),
+  ];
+  const publicDir = candidatePublicDirs.find((dir) => fs.existsSync(path.join(dir, 'index.html'))) || __dirname;
 
   app.use(express.static(publicDir, {
     maxAge: 0,
